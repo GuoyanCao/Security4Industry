@@ -1,5 +1,8 @@
 import socket
+from ssl import wrap_socket
 import os
+import ssl
+
 config = {}
 
 def configinport():
@@ -24,11 +27,17 @@ def RequestDeploy(Command,Client) :
     print(Content)
 
 def StartService():
+    # 生成SSL环境
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # 加载服务器所用证书和私钥
+    context.load_cert_chain('DNC_cert.crt', 'DNC_rsa_private.key')
+
     sk = socket.socket()
     sk.bind((config["host"],int(config["port"])))
     sk.listen(1)
+    ssl_sk = context.wrap_socket(sk, server_side=True)
     while True :
-        client, addr = sk.accept()
+        client, addr = ssl_sk.accept()
         while True :
             ret_bytes = client.recv(10240)
             Receive = str(ret_bytes,encoding="utf-8")
@@ -40,7 +49,7 @@ def StartService():
                 RequestDeploy(Receive.split(" ")[1],client)
         client.close()
         print("finished")
-    sk.close()
+    ssl_sk.close()
 
 if __name__ == '__main__':
     configinport()

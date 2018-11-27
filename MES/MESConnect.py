@@ -1,11 +1,48 @@
 import socket
 import time
 import os
+import ssl
+import pprint
 
 config = {}
 ConnectFlag = False
 
-tryConnect = socket.socket()
+# 生成SSL环境
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+'''
+PROTOCOL_TLS_CLIENT:
+Auto-negotiate the highest protocol version like PROTOCOL_TLS, 
+but only support client-side SSLSocket connections. 
+The protocol enables CERT_REQUIRED and check_hostname by default.
+'''
+# 设置需要验证证书
+#c ontext.verify_mode = ssl.CERT_REQUIRED
+
+# 设置需要检查主机名
+# context.check_hostname = True
+
+# 加载信任根证书
+context.load_verify_locations('CA_cert.crt')
+
+# 选择使用加密套件
+# 参考 https://www.openssl.org/docs/manmaster/man1/ciphers.html
+# 密码套件 密钥交换算法-批量加密算法-消息认真码算法-伪随机函数
+context.set_ciphers('AES256-SHA')
+
+# 显示可用的加密方法列表
+pprint.pprint(context.get_ciphers())
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0) as sock:
+    tryConnect = context.wrap_socket(sock, server_hostname='DNC')
+
+def showCert(ctx):
+    '''
+    功能：提供可视化检查证书功能
+    参数：
+        ctx：由ssl.warp_sock()返回的SSLScoket对象
+    '''
+    cert = ctx.getpeercert()
+    pprint.pprint(cert)
 
 def ConfigImport():
     cfgfile = open("MES.cfg")
@@ -18,6 +55,8 @@ def ConfigImport():
 def Connect2Server():
     try :
         tryConnect.connect((config['target'],int(config['port'])))
+
+        tryConnect.cipher() # 启用加密
         print("Connect to server %s (port %s) successfully" % (config['target'],config['port']))
         return True
     except :
@@ -118,6 +157,8 @@ def status(Command):
             return
 
 def FunctionCycle():
+    # 显示证书
+    showCert(tryConnect)
     function = ["status", "deploy", "help", "exit"]
     help = {"status":"Show status for NC device.\nUsage: status [device1] [device2] ... [A] [/?]",
             "deploy":"Deploy acsii commmand to NC device.\nUsage: deploy [acsii_file_path] [device1] [device2] ... [A] [/?]",
